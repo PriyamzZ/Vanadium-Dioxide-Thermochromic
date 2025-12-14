@@ -1,0 +1,60 @@
+
+import pandas as pd
+import numpy as np
+import seaborn as sns
+import matplotlib.pyplot as plt
+
+df=pd.read_csv(....\vo2_dataset.csv")
+print(df.columns.tolist())
+
+df.describe()
+
+plt.figure(figsize=(8,6))
+sns.heatmap(df.corr(numeric_only=True), annot=True, fmt=".2f", cmap="Reds")
+plt.title("Correlation Between Features")
+plt.show()
+
+continuous = ["Power", "Temperature", "O2_Ar_Ratio", "Pressure"]
+
+fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+axes = axes.flatten()
+
+for i, col in enumerate(continuous):
+    sns.histplot(data=df, x=col, kde=True, ax=axes[i], element="step", color='lightcoral')
+    axes[i].set_title(f"Histogram of {col}")
+    axes[i].set_xlabel(col)
+    axes[i].set_ylabel("Count")
+
+plt.tight_layout()
+plt.show()
+
+continuous = ["Power", "Temperature", "O2_Ar_Ratio", "Pressure"]
+categorical = ["Target_Material", "Substrate"]
+
+for cat in categorical:
+    fig, axes = plt.subplots(2, 2, figsize=(12, 8))
+    axes = axes.flatten()
+
+    for i, cont in enumerate(continuous):
+        sns.boxplot(data=df, x=cat, y=cont, ax=axes[i], hue=cat, palette="flare", legend=False)
+        axes[i].set_title(f"{cont} vs {cat}")
+        axes[i].set_xlabel(cat)
+        axes[i].set_ylabel(cont)
+
+    fig.suptitle(f"Boxplots grouped by {cat}", y=1.02)
+    plt.tight_layout()
+    plt.show()
+
+
+sns.pairplot(df, vars=continuous, hue="Label", palette="flare", corner=False)
+plt.show()
+
+fig, axes = plt.subplots(1, 2, figsize=(12,4))
+sns.countplot(data=df, x="Target_Material", hue="Label", ax=axes[0], palette="flare")
+axes[0].set_title("Target Material vs Label")
+
+sns.countplot(data=df, x="Substrate", hue="Label", ax=axes[1], palette="flare")
+axes[1].set_title("Substrate vs Label")
+
+plt.tight_layout()
+plt.show()
