@@ -1,0 +1,25 @@
+from sklearn.model_selection import train_test_split
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+
+
+df_model = df.copy()
+
+for col in ["Target_Material", "Substrate"]:
+    le = LabelEncoder()
+    df_model[col] = le.fit_transform(df_model[col])
+#%%
+X = df.drop("Label", axis=1)
+y = df["Label"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, stratify=y, random_state=42
+)
+
+preprocess = ColumnTransformer(
+    transformers=[
+        ("num", StandardScaler(),continuous),
+        ("cat", OneHotEncoder(handle_unknown="ignore"), categorical)
+    ],
+    remainder="drop"
+)
