@@ -1,0 +1,102 @@
+from sklearn.model_selection import train_test_split, GridSearchCV
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.pipeline import Pipeline
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.metrics import classification_report
+from sklearn.preprocessing import LabelEncoder
+
+df_model = df.copy()
+
+for col in ["Target_Material", "Substrate"]:
+    le = LabelEncoder()
+    df_model[col] = le.fit_transform(df_model[col])
+
+
+X = df.drop("Label", axis=1)
+y = df["Label"]
+
+X_train, X_test, y_train, y_test = train_test_split(
+    X, y, test_size=0.2, stratify=y, random_state=42
+)
+
+preprocess = ColumnTransformer(
+    transformers=[
+        ("num", StandardScaler(),continuous),
+        ("cat", OneHotEncoder(handle_unknown="ignore"), categorical)
+    ],
+    remainder="drop"
+)
+
+## KNN
+
+knn_pipe = Pipeline([
+    ("prep", preprocess),
+    ("model", KNeighborsClassifier())
+])
+
+knn_params = {
+    "model__n_neighbors": [3, 5, 7, 11, 15],
+    "model__weights": ["uniform", "distance"],
+    "model__p": [1, 2]   # 1=Manhattan, 2=Euclidean
+}
+
+knn_search = GridSearchCV(knn_pipe, knn_params, cv=5, n_jobs=-1)
+knn_search.fit(X_train, y_train)
+
+print(" KNN ")
+print("Best params:", knn_search.best_params_)
+print(classification_report(y_test, knn_search.predict(X_test)))
+
+
+
+# Logistic Regression
+
+log_pipe = Pipeline([
+    ("prep", preprocess),
+    ("model", LogisticRegression(max_iter=5000))
+])
+
+log_params = {
+    "model__C": [0.01, 0.1, 1, 10, 100],
+    "model__solver": ["lbfgs", "liblinear"]
+}
+
+log_search = GridSearchCV(log_pipe, log_params, cv=5, n_jobs=-1)
+log_search.fit(X_train, y_train)
+
+print("Logistic Regression ")
+print("Best params:", log_search.best_params_)
+print(classification_report(y_test, log_search.predict(X_test)))
+
+
+# Random Forest
+
+rf_preprocess = ColumnTransformer(
+    transformers=[
+        ("num", "passthrough", continuous),
+        ("cat", OneHotEncoder(handle_unknown="ignore"), categorical)
+    ],
+    remainder="drop"
+)
+
+rf_pipe = Pipeline([
+    ("prep", rf_preprocess),
+    ("model", RandomForestClassifier(random_state=42))
+])
+
+rf_params = {
+    "model__n_estimators": [200, 400, 600],
+    "model__max_depth": [None, 5, 10, 20],
+    "model__min_samples_split": [2, 5, 10],
+    "model__min_samples_leaf": [1, 2, 4]
+}
+
+rf_search = GridSearchCV(rf_pipe, rf_params, cv=5, n_jobs=-1)
+rf_search.fit(X_train, y_train)
+
+print(" Random Forest ")
+print("Best params:", rf_search.best_params_)
+print(classification_report(y_test, rf_search.predict(X_test)))
