@@ -1,0 +1,169 @@
+from sklearn.metrics import (ConfusionMatrixDisplay, RocCurveDisplay)
+from sklearn.inspection import PartialDependenceDisplay
+
+def get_feature_names_from_pipeline(best_estimator):
+
+    prep = best_estimator.named_steps["prep"]
+    try:
+        names = prep.get_feature_names_out()
+        return np.array(names, dtype=str)
+    except Exception:
+        # Fallback: try to build names manually
+        names = []
+        for name, trans, cols in prep.transformers_:
+            if name == "remainder":
+                continue
+            if hasattr(trans, "get_feature_names_out"):
+                try:
+                    names.extend(trans.get_feature_names_out(cols))
+                except TypeError:
+                    names.extend(trans.get_feature_names_out())
+            else:
+                # passthrough scaler etc.
+                if isinstance(cols, (list, tuple, np.ndarray)):
+                    names.extend(list(cols))
+                else:
+                    names.append(str(cols))
+        return np.array(names, dtype=str)
+
+def plot_confusion_matrices(models, X_test, y_test):
+    fig, axes = plt.subplots(1, len(models), figsize=(5 * len(models), 4))
+    if len(models) == 1:
+        axes = [axes]
+
+    for ax, (name, gs) in zip(axes, models.items()):
+        best = gs.best_estimator_
+        ConfusionMatrixDisplay.from_estimator(best, X_test, y_test, ax=ax, colorbar=False)
+        ax.set_title(f"Confusion Matrix: {name}")
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_roc_curves(models, X_test, y_test):
+    plt.figure(figsize=(7, 6))
+    ax = plt.gca()
+
+    for name, gs in models.items():
+        best = gs.best_estimator_
+        RocCurveDisplay.from_estimator(best, X_test, y_test, ax=ax, name=name)
+
+    ax.set_title("ROC Curves (Test Set)")
+    plt.tight_layout()
+    plt.show()
+
+def plot_top_coefficients(log_gs, top_n=20):
+    best = log_gs.best_estimator_
+    feature_names = get_feature_names_from_pipeline(best)
+
+    coefs = best.named_steps["model"].coef_.ravel()
+    idx = np.argsort(np.abs(coefs))[-top_n:]
+    idx = idx[np.argsort(coefs[idx])]  # sorted by signed coef for nicer plot
+
+    plt.figure(figsize=(8, 6))
+    plt.barh(feature_names[idx], coefs[idx])
+    plt.title(f"Logistic Regression: Top {top_n} Coefficients (by |coef|)")
+    plt.xlabel("Coefficient (signed)")
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_rf_importances(rf_gs, top_n=20):
+    best = rf_gs.best_estimator_
+    feature_names = get_feature_names_from_pipeline(best)
+
+    importances = best.named_steps["model"].feature_importances_
+    idx = np.argsort(importances)[-top_n:]
+    idx = idx[np.argsort(importances[idx])]  # ascending for barh
+
+    plt.figure(figsize=(8, 6))
+    plt.barh(feature_names[idx], importances[idx])
+    plt.title(f"Random Forest: Top {top_n} Feature Importances")
+    plt.xlabel("Importance")
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_partial_dependence(gs, X_train, features, title):
+    best = gs.best_estimator_
+    fig, ax = plt.subplots(figsize=(10, 6))
+    PartialDependenceDisplay.from_estimator(
+        best, X_train, features=features, ax=ax
+    )
+    ax.set_title(title)
+    plt.tight_layout()
+    plt.show()
+
+def plot_2d_decision_slice(gs, X_ref, x_feat, y_feat, title, grid_points=200):
+
+    best = gs.best_estimator_
+    X_base = X_ref.copy()
+
+    # Fix other columns
+    fixed = {}
+    for col in X_base.columns:
+        if col in [x_feat, y_feat]:
+            continue
+        if pd.api.types.is_numeric_dtype(X_base[col]):
+            fixed[col] = X_base[col].median()
+        else:
+            fixed[col] = X_base[col].mode(dropna=True).iloc[0]
+
+    x_min, x_max = X_base[x_feat].min(), X_base[x_feat].max()
+    y_min, y_max = X_base[y_feat].min(), X_base[y_feat].max()
+
+    xs = np.linspace(x_min, x_max, grid_points)
+    ys = np.linspace(y_min, y_max, grid_points)
+    xx, yy = np.meshgrid(xs, ys)
+
+    grid = pd.DataFrame({
+        x_feat: xx.ravel(),
+        y_feat: yy.ravel()
+    })
+
+    for col, val in fixed.items():
+        grid[col] = val
+    grid = grid[X_base.columns]
+
+    # Predict probabilities for class 1
+    proba = best.predict_proba(grid)[:, 1].reshape(xx.shape)
+
+    plt.figure(figsize=(8, 6))
+    plt.contourf(xx, yy, proba, levels=20)
+    plt.colorbar(label="P(Label=1)")
+    plt.xlabel(x_feat)
+    plt.ylabel(y_feat)
+    plt.title(title + "\n(others fixed at median/mode)")
+    plt.tight_layout()
+    plt.show()
+#%%
+models = {
+    "KNN": knn_search,
+    "LogReg": log_search,
+    "RandomForest": rf_search
+}
+
+# 1) Confusion matrices
+plot_confusion_matrices(models, X_test, y_test)
+
+# 2) ROC curves
+plot_roc_curves(models, X_test, y_test)
+
+# 3) Logistic regression coefficient plot
+plot_top_coefficients(log_search, top_n=20)
+
+# 4) Random forest importances
+plot_rf_importances(rf_search, top_n=20)
+
+# 5) Partial dependence (continuous features only)
+plot_partial_dependence(
+    rf_search,
+    X_train,
+    features=["Temperature", "O2_Ar_Ratio", "Pressure", "Power"],
+    title="Random Forest: Partial Dependence (raw features)"
+)
+
+# 6) 2D decision boundary slices (Temperature vs O2_Ratio)
+plot_2d_decision_slice(knn_search, X_train, "Temperature", "O2_Ar_Ratio", "KNN decision slice")
+plot_2d_decision_slice(log_search, X_train, "Temperature", "O2_Ar_Ratio", "LogReg decision slice")
+plot_2d_decision_slice(rf_search,  X_train, "Temperature", "O2_Ar_Ratio", "RF decision slice")
