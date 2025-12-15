@@ -1,1 +1,48 @@
+# =====================
+# Data (Kaggle / local)
+# =====================
+data/
+*.csv
+*.zip
+
+# =====================
+# Jupyter
+# =====================
+.ipynb_checkpoints/
+
+# =====================
+# Python
+# =====================
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+.env
+.venv
+venv/
+
+# =====================
+# OS files
+# =====================
+.DS_Store
+Thumbs.db
+
+# =====================
+# Logs & temp files
+# =====================
+*.log
+*.tmp
+
+# =====================
+# IDE / editors
+# =====================
+.vscode/
+.idea/
+
+# =====================
+# Figures (optional)
+# Comment these out if you WANT to track images
+# =====================
+# figures/
 
