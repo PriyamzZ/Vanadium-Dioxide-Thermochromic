@@ -23,3 +23,8 @@ preprocess = ColumnTransformer(
     ],
     remainder="drop"
 )
+
+X_train_prepared = preprocess.fit_transform(X_train)
+X_test_prepared = preprocess.transform(X_test)
+
+X_train_prepared.shape, X_test_prepared.shape
